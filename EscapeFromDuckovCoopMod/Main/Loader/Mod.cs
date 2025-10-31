@@ -1116,7 +1116,65 @@ public class ModBehaviourF : MonoBehaviour
                 var face = reader.GetString();
 
                 if (IsServer) SceneNet.Instance.Server_HandleSceneReady(peer, id, sid, pos, rot, face);
-                // 客户端若收到这条（主机广播），实际创建工作由 REMOTE_CREATE 完成，这里不处理
+                else
+                {
+                    // 新增：客户端在收到 SCENE_READY 时，缓存该玩家的 SceneId 作为兜底，以便观战/同图判断可以立即生效
+                    // New: On client receiving SCENE_READY, cache player's SceneId as a fallback so spectate/same-map checks work immediately
+                    if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(sid))
+                    {
+                        SceneNet.Instance._cliLastSceneIdByPlayer[id] = sid; // 兜底缓存
+                        // 之前的代码是：客户端不处理 SCENE_READY，等待 PLAYER_STATUS_UPDATE/ POSITION_UPDATE 后才设置 SceneId
+                        // 修改后的代码是：客户端也在 SCENE_READY 阶段写入 _cliLastSceneIdByPlayer，提升“同图”判断的及时性
+                    }
+
+                    // 附加：同步更新 clientPlayerStatuses 中的条目（若存在），确保 SceneId、位置和脸型数据立刻可用
+                    // Additional: update clientPlayerStatuses entry (if exists) so SceneId/position/face are available immediately
+                    if (clientPlayerStatuses.TryGetValue(id, out var st) && st != null)
+                    {
+                        st.SceneId = string.IsNullOrEmpty(sid) ? st.SceneId : sid;
+                        st.IsInGame = true;
+                        st.Position = pos;
+                        st.Rotation = rot;
+                        if (!string.IsNullOrEmpty(face)) st.CustomFaceJson = face;
+                    }
+                    else if (!NetService.Instance.IsSelfId(id))
+                    {
+                        // 如果没有现成的状态条目，补充一个最小条目，便于后续逻辑使用
+                        // If no existing status entry, add a minimal one for downstream logic
+                        clientPlayerStatuses[id] = new PlayerStatus
+                        {
+                            EndPoint = id,
+                            PlayerName = "Remote",
+                            Latency = 0,
+                            IsInGame = true,
+                            LastIsInGame = true,
+                            Position = pos,
+                            Rotation = rot,
+                            SceneId = sid,
+                            CustomFaceJson = face
+                        };
+                    }
+
+                    // 提前创建远端对象（如果本地还没有），避免等待下一次 POSITION_UPDATE 才出现主机/队友
+                    // Create remote character early (if missing) to avoid waiting for next POSITION_UPDATE
+                    if (!NetService.Instance.IsSelfId(id))
+                    {
+                        if (!clientRemoteCharacters.ContainsKey(id) || clientRemoteCharacters[id] == null)
+                        {
+                            CreateRemoteCharacter.CreateRemoteCharacterForClient(id, pos, rot, face).Forget();
+                        }
+                        else
+                        {
+                            // 已存在则更新一次插值位置，确保初始位置一致
+                            // If exists, push an initial sample to align starting pose
+                            var go = clientRemoteCharacters[id];
+                            var ni = NetInterpUtil.Attach(go);
+                            ni?.Push(pos, rot);
+                        }
+                    }
+                }
+                // 说明：新增了客户端对 SCENE_READY 的处理，用于 SceneId 兜底缓存与远端对象的提前创建/更新。
+                // Difference: previously client ignored SCENE_READY; now we cache sceneId and prepare remote character earlier to improve visibility and same-map checks.
                 break;
             }
 
