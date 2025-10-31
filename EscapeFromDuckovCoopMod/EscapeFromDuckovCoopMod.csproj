@@ -274,14 +274,22 @@
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-    </ItemGroup>
+  </ItemGroup>
 
-    <Target Name="CopyToModsFolder" AfterTargets="Build">
-        <PropertyGroup>
-            <_ModFolder>$(DUCKOV_MODS_DIRECTORY)\$(ProjectName)</_ModFolder>
-        </PropertyGroup>
+  <!-- 构建前校验：若 DUCKOV_GAME_MANAGED 未设置或路径不存在，提前给出明确错误并终止构建 -->
+  <!-- 变更：将触发点从 Build 改为 ResolveReferences/CoreCompile，确保在引用解析/编译前即阻断 -->
+  <Target Name="ValidateDuckovManaged" BeforeTargets="ResolveReferences;CoreCompile">
+    <!-- 说明/Note: 此检查可避免因缺少游戏 DLL 引用而导致的成百上千类型/命名空间错误，改为直观的环境配置提示。 -->
+    <Error Condition="'$(DUCKOV_GAME_MANAGED)' == ''" Text="[EscapeFromDuckovCoopMod] DUCKOV_GAME_MANAGED is not set. Please set it to your game's Duckov_Data\\Managed folder path (e.g., C:\\Steam\\steamapps\\common\\Escape from Duckov\\Duckov_Data\\Managed)." />
+    <Error Condition="'$(DUCKOV_GAME_MANAGED)' != '' and !Exists('$(DUCKOV_GAME_MANAGED)')" Text="[EscapeFromDuckovCoopMod] DUCKOV_GAME_MANAGED path does not exist: $(DUCKOV_GAME_MANAGED). Please set it to the valid Duckov_Data\\Managed folder path." />
+  </Target>
 
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(_ModFolder)" SkipUnchangedFiles="true" />
-        <Message Text="Copied DLL -&gt; $(_ModFolder)\$(AssemblyName).dll" Importance="High" />
-    </Target>
+  <Target Name="CopyToModsFolder" AfterTargets="Build">
+    <PropertyGroup>
+      <_ModFolder>$(DUCKOV_MODS_DIRECTORY)\$(ProjectName)</_ModFolder>
+    </PropertyGroup>
+
+    <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(_ModFolder)" SkipUnchangedFiles="true" />
+    <Message Text="Copied DLL -&gt; $(_ModFolder)\$(AssemblyName).dll" Importance="High" />
+  </Target>
 </Project>

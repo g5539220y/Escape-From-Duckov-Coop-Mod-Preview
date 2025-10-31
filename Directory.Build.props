@@ -1,9 +1,21 @@
 <Project>
+    <!-- 修复说明（中文/English）：
+         - 作用/Function: 让构建正确读取游戏的 Managed 目录（Unity/游戏 DLL 引用），避免“未能找到类型或命名空间名 UnityEngine/MonoBehaviour”等错误。
+         - 变更/Change: 支持直接使用环境变量 `DUCKOV_GAME_MANAGED`，并只在路径存在时设定；避免用空路径覆盖；若提供 `DUCKOV_GAME_DIRECTORY`，再派生 `Duckov_Data\Managed`。
+         - 原因/Reason: 原 props 总是派生 `DUCKOV_GAME_MANAGED`，当 `DUCKOV_GAME_DIRECTORY` 未设置时会得到无效路径，导致所有 Unity/Game 引用失效。 -->
     <PropertyGroup>
-        <GameDirectory Condition="Exists('$(DUCKOV_GAME_DIRECTORY)')">$(DUCKOV_GAME_DIRECTORY)</GameDirectory>
-        <DUCKOV_DATA_DIRECTORY>$(GameDirectory)\Duckov_Data</DUCKOV_DATA_DIRECTORY>
-        <DUCKOV_MODS_DIRECTORY>$(DUCKOV_DATA_DIRECTORY)\Mods</DUCKOV_MODS_DIRECTORY>
-        <DUCKOV_GAME_MANAGED>$(DUCKOV_DATA_DIRECTORY)\Managed</DUCKOV_GAME_MANAGED>
+        <!-- 优先使用已设置且存在的 DUCKOV_GAME_MANAGED（环境变量同名会作为 MSBuild 属性注入） -->
+        <DUCKOV_GAME_MANAGED Condition="'$(DUCKOV_GAME_MANAGED)' != '' and Exists('$(DUCKOV_GAME_MANAGED)')">$(DUCKOV_GAME_MANAGED)</DUCKOV_GAME_MANAGED>
+
+        <!-- 兼容 DUCKOV_GAME_DIRECTORY：只有在存在时才设定 GameDirectory -->
+        <GameDirectory Condition="'$(GameDirectory)' == '' and Exists('$(DUCKOV_GAME_DIRECTORY)')">$(DUCKOV_GAME_DIRECTORY)</GameDirectory>
+
+        <!-- 只有在 GameDirectory 有效时，派生 Duckov_Data 路径 -->
+        <DUCKOV_DATA_DIRECTORY Condition="'$(DUCKOV_DATA_DIRECTORY)' == '' and '$(GameDirectory)' != '' and Exists('$(GameDirectory)')">$(GameDirectory)\Duckov_Data</DUCKOV_DATA_DIRECTORY>
+        <DUCKOV_MODS_DIRECTORY Condition="'$(DUCKOV_DATA_DIRECTORY)' != ''">$(DUCKOV_DATA_DIRECTORY)\Mods</DUCKOV_MODS_DIRECTORY>
+
+        <!-- 若未显式提供 DUCKOV_GAME_MANAGED，但有有效的 GameDirectory，则派生 Managed 路径 -->
+        <DUCKOV_GAME_MANAGED Condition="'$(DUCKOV_GAME_MANAGED)' == '' and '$(DUCKOV_DATA_DIRECTORY)' != ''">$(DUCKOV_DATA_DIRECTORY)\Managed</DUCKOV_GAME_MANAGED>
     </PropertyGroup>
 
     <ItemDefinitionGroup>
