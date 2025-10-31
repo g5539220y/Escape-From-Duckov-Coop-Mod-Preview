@@ -62,6 +62,26 @@ public class LoaclPlayerManager : MonoBehaviour
         Instance = this;
     }
 
+    /// <summary>
+    /// Reset local player's death-related lifecycle flags at the start of a new raid/scene.
+    /// Ensures corpse-tree reporting and death events do not carry over from previous raids.
+    /// 作用：在新一局/新场景开始时，重置本地与死亡相关的标记，避免上一局的状态影响本局。
+    /// - 清空“已上报尸体树”标记，使本命下一次死亡可重新上报
+    /// - 清空“补发死亡事件”上下文标记
+    /// - 清空“本轮已触发过补发”标记
+    /// </summary>
+    public void ResetLocalDeathLifecycleForNewRaid()
+    {
+        // 清空：是否已经上报过“本轮生命”的尸体/战利品（= 主机已可生成，不要再上报）
+        _cliCorpseTreeReported = false;
+
+        // 清空：“补发死亡”的 OnDead 触发上下文标记
+        _cliInEnsureSelfDeathEmit = false;
+
+        // 清空：本轮是否已补发过一次 OnDead（允许新一轮重新补发）
+        _cliSelfDeathFired = false;
+    }
+
     public void InitializeLocalPlayer()
     {
         var bool1 = ComputeIsInGame(out var ids);

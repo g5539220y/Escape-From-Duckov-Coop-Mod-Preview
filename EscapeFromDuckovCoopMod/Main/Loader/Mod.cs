@@ -315,12 +315,25 @@ public class ModBehaviourF : MonoBehaviour
 
         COOPManager.GrenadeM.ProcessPendingGrenades();
 
+        // 之前的代码是：客户端若存在待应用的 SELF HP，则直接套用并清除 pending：
+        // if (!IsServer)
+        //     if (CoopTool._cliSelfHpPending && CharacterMainControl.Main != null)
+        //     {
+        //         HealthM.Instance.ApplyHealthAndEnsureBar(CharacterMainControl.Main.gameObject, CoopTool._cliSelfHpMax, CoopTool._cliSelfHpCur);
+        //         CoopTool._cliSelfHpPending = false;
+        //     }
+        // 修改后的代码是：注释掉以上块，避免过早清除 _cliSelfHpPending，从而允许
+        // CoopTool.Client_ApplyPendingSelfIfReady() 检测到 0 血后补发 OnDead 以重置死亡标记。
+        // 说明：原逻辑会在每帧提前清掉 pending，导致 Client_ApplyPendingSelfIfReady() 直接 return，
+        // 从而错过 LoaclPlayerManager.Client_EnsureSelfDeathEvent 的触发，跨局可能保留 _cliCorpseTreeReported=true。
+        /*
         if (!IsServer)
             if (CoopTool._cliSelfHpPending && CharacterMainControl.Main != null)
             {
                 HealthM.Instance.ApplyHealthAndEnsureBar(CharacterMainControl.Main.gameObject, CoopTool._cliSelfHpMax, CoopTool._cliSelfHpCur);
                 CoopTool._cliSelfHpPending = false;
             }
+        */
 
 
         if (IsServer) HealthM.Instance.Server_EnsureAllHealthHooks();
@@ -473,6 +486,34 @@ public class ModBehaviourF : MonoBehaviour
     {
         SceneNet.Instance.TrySendSceneReadyOnce();
         if (!IsServer) COOPManager.Weather.Client_RequestEnvSync();
+
+        // 在新场景载入时重置本地死亡相关生命周期标记，避免跨局遗留导致不再上报尸体/战利品
+        // Reset local death lifecycle flags on new scene load to prevent stale state across raids
+        try
+        {
+            var lpm = LoaclPlayerManager.Instance;
+            if (lpm)
+            {
+                lpm.ResetLocalDeathLifecycleForNewRaid();
+            }
+        }
+        catch
+        {
+        }
+
+        // 在新场景载入时清理战利品缓存，避免跨局遗留的 UID→容器映射导致空箱或错箱
+        // Reset loot caches on new scene load to avoid stale UID→Inventory mappings
+        try
+        {
+            var lm = LootManager.Instance;
+            if (lm)
+            {
+                lm.ResetLootCachesOnSceneChange();
+            }
+        }
+        catch
+        {
+        }
     }
 
 

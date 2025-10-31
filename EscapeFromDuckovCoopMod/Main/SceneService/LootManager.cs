@@ -260,6 +260,31 @@ public class LootManager : MonoBehaviour
         Instance = this;
     }
 
+    /// <summary>
+    /// Reset loot-related caches when a new scene/raid begins to avoid stale mappings.
+    /// 作用：在新场景/新一局开始时清理战利品相关缓存，避免旧局的容器映射影响本局（导致空箱/错箱）。
+    /// 清理内容：
+    /// - 客户端 uid→Inventory 映射
+    /// - 服务器 uid→Inventory 映射
+    /// - 待应用的容器快照缓存
+    /// - 客户端待排序/待取走的操作缓存
+    /// - 主机侧下一次分配的稳定 loot UID（重置为 1）
+    /// </summary>
+    public void ResetLootCachesOnSceneChange()
+    {
+        try { _cliLootByUid.Clear(); } catch { }
+        try { _srvLootByUid.Clear(); } catch { }
+        try { _pendingLootStatesByUid.Clear(); } catch { }
+        try { _cliPendingReorder.Clear(); } catch { }
+        try { _cliPendingTake.Clear(); } catch { }
+
+        // 服务器侧：新场景重置稳定 UID 自增序列，确保每局唯一且不与旧局混用
+        if (IsServer)
+        {
+            _nextLootUid = 1;
+        }
+    }
+
 
     public int ComputeLootKey(Transform t)
     {
