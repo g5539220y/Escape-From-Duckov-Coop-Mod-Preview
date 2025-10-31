@@ -69,6 +69,12 @@ internal static class Patch_Melee_FlagLocalDeal
 [HarmonyPatch(typeof(ItemAgent_Gun), "ShootOneBullet")]
 public static class Patch_ShootOneBullet_Client
 {
+    /// <summary>
+    /// 客户端侧拦截本地主角的开火，改为向主机发送 FIRE_REQUEST；
+    /// 同时在菜单/暂停界面打开时（Pausebool==true）阻断射击，避免点击菜单触发开火。
+    /// Client-side: intercept local main character shooting to send FIRE_REQUEST to host;
+    /// also block firing when pause/menu is open (Pausebool==true) to prevent UI clicks from shooting.
+    /// </summary>
     private static bool Prefix(ItemAgent_Gun __instance, Vector3 _muzzlePoint, Vector3 _shootDirection, Vector3 firstFrameCheckStartPoint)
     {
         var mod = ModBehaviourF.Instance;
@@ -76,6 +82,17 @@ public static class Patch_ShootOneBullet_Client
 
         var isClient = !mod.IsServer;
         if (!isClient) return true;
+
+        // 菜单打开保护：当 Pausebool 为 true 时，直接阻断本次开火。
+        // Menu-open guard: when Pausebool is true, block firing to avoid menu click firing.
+        if (mod.Pausebool)
+        {
+            // 说明：UI/菜单处于打开状态，不触发网络请求，不执行原方法，避免误触发射击
+            // Note: UI/menu is open; skip network request and original method to prevent accidental shots
+            return false;
+        }
+        // 之前的代码是：未判断 Pausebool，菜单/暂停界面打开时鼠标点击可能触发开火逻辑
+        // 修改后的代码是：在前置拦截中增加 Pausebool 判断，菜单打开时直接返回 false 阻断本次开火
 
         var holder = __instance.Holder;
         var isLocalMain = holder == CharacterMainControl.Main;

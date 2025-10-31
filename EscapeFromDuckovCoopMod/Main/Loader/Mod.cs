@@ -422,17 +422,36 @@ public class ModBehaviourF : MonoBehaviour
             // 鼠标左/右键切换（加个轻微节流）
             if (Time.unscaledTime >= _spectateNextSwitchTime)
             {
-                if (Input.GetMouseButtonDown(0))
+                // 菜单打开保护：当 Pausebool 为 true 时，不响应观战切换的鼠标点击，避免菜单点击影响观战目标
+                // Menu-open guard: when Pausebool is true, ignore spectator mouse switching to prevent UI clicks from affecting target
+                if (!Pausebool)
                 {
-                    Spectator.Instance.SpectateNext();
-                    _spectateNextSwitchTime = Time.unscaledTime + 0.15f;
+                    if (Input.GetMouseButtonDown(0))
+                    {
+                        Spectator.Instance.SpectateNext();
+                        _spectateNextSwitchTime = Time.unscaledTime + 0.15f;
+                    }
+
+                    if (Input.GetMouseButtonDown(1))
+                    {
+                        Spectator.Instance.SpectatePrev();
+                        _spectateNextSwitchTime = Time.unscaledTime + 0.15f;
+                    }
                 }
 
-                if (Input.GetMouseButtonDown(1))
-                {
-                    Spectator.Instance.SpectatePrev();
-                    _spectateNextSwitchTime = Time.unscaledTime + 0.15f;
-                }
+                // 之前的代码是（在菜单打开时也会响应点击）：
+                // if (Input.GetMouseButtonDown(0))
+                // {
+                //     Spectator.Instance.SpectateNext();
+                //     _spectateNextSwitchTime = Time.unscaledTime + 0.15f;
+                // }
+                // if (Input.GetMouseButtonDown(1))
+                // {
+                //     Spectator.Instance.SpectatePrev();
+                //     _spectateNextSwitchTime = Time.unscaledTime + 0.15f;
+                // }
+                // 说明：上述原逻辑在菜单/暂停界面打开时会响应鼠标点击，可能导致误切换观战目标。
+                // 修改后的代码是在外层增加 Pausebool 判断，仅当菜单未打开时才处理鼠标切换，避免 UI 点击影响观战切换。
             }
         }
     }

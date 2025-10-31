@@ -19,11 +19,23 @@ namespace EscapeFromDuckovCoopMod;
 [HarmonyPatch(typeof(CharacterAnimationControl_MagicBlend), "OnAttack")]
 internal static class Patch_Melee_OnAttack_SendNetAndFx
 {
+    /// <summary>
+    /// 玩家近战攻击动画事件：客户端触发时播放本地FX并上报主机；
+    /// 当菜单/暂停界面打开（Pausebool==true）时，阻断近战网络与本地特效，避免菜单点击导致攻击。
+    /// Player melee OnAttack: client plays local FX and reports to host;
+    /// when pause/menu is open (Pausebool==true), block network FX/attack to prevent UI clicks causing attacks.
+    /// </summary>
     private static void Postfix(CharacterAnimationControl_MagicBlend __instance)
     {
         var mod = ModBehaviourF.Instance;
         var ctrl = __instance?.characterMainControl;
         if (mod == null || !mod.networkStarted || ctrl == null) return;
+        
+        // 菜单打开保护：当 Pausebool 为 true 时，不触发近战网络与本地特效
+        // Menu-open guard: when Pausebool is true, skip melee FX and network report
+        if (mod.Pausebool) return;
+        // 之前的代码是：没有对 Pausebool 的判断，菜单打开时鼠标点击会触发近战攻击与网络上报
+        // 修改后的代码是：在此增加 Pausebool 判断，菜单/暂停界面打开时直接 return，阻断近战触发与网络上报
         if (ctrl != CharacterMainControl.Main) return; // 只处理本地玩家
 
         // 一帧一次闸门（解决重复注入/重复回调）
